@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pandaball Space Split – Pop Effect</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: #ffffff; /* 宇宙背景 */
+      }
+      canvas {
+        background: #715fb7; /* 星空の色 */
+        border: 2px solid #333;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const img = new Image();
+      img.src = "pandaball.png";
+
+      // --- パラメータ ---------------------------
+      const gravity = 0;
+      const bounceFactor = 1;
+      const splitFactor = 2 / 3;
+      const minSize = 16;
+      const burstDuration = 12;
+      const maxSpeed = 8;
+
+      const starCount = 100;
+      const stars = [];
+
+      // --- 星の初期化 ---------------------------
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 1.5 + 0.5,
+        });
+      }
+
+      // --- 最初のボール -------------------------
+      const balls = [
+        {
+          x: canvas.width / 2 - 24,
+          y: canvas.height / 2 - 24,
+          width: 128,
+          height: 120,
+          vx: 4,
+          vy: 3,
+          angle: 0,
+          spin: 0.02,
+          burstFrame: burstDuration,
+        },
+      ];
+
+      // --- 星の描画 -----------------------------
+      function drawStars() {
+        ctx.fillStyle = "#715fb7"; // 星空の背景色
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "white"; // 星の色（白）
+        for (const star of stars) {
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // --- 更新処理 -----------------------------
+      function update() {
+        for (const b of balls) {
+          b.vy += gravity;
+          b.x += b.vx;
+          b.y += b.vy;
+
+          // 最大速度制限
+          b.vx = Math.max(-maxSpeed, Math.min(maxSpeed, b.vx));
+          b.vy = Math.max(-maxSpeed, Math.min(maxSpeed, b.vy));
+
+          if (b.x <= 0) {
+            b.x = 0;
+            b.vx *= -bounceFactor;
+          } else if (b.x + b.width >= canvas.width) {
+            b.x = canvas.width - b.width;
+            b.vx *= -bounceFactor;
+          }
+
+          if (b.y <= 0) {
+            b.y = 0;
+            b.vy *= -bounceFactor;
+          } else if (b.y + b.height >= canvas.height) {
+            b.y = canvas.height - b.height;
+            b.vy *= -bounceFactor;
+          }
+
+          b.angle += b.spin;
+        }
+
+        // 衝突判定
+        for (let i = 0; i < balls.length; i++) {
+          for (let j = i + 1; j < balls.length; j++) {
+            const b1 = balls[i];
+            const b2 = balls[j];
+            const dx = b2.x - b1.x;
+            const dy = b2.y - b1.y;
+            const dist = Math.hypot(dx, dy);
+            const minDist = (b1.width + b2.width) / 2;
+
+            if (dist < minDist) {
+              const angle = Math.atan2(dy, dx);
+              const ax = Math.cos(angle) * 0.5;
+              const ay = Math.sin(angle) * 0.5;
+
+              b1.vx -= ax;
+              b1.vy -= ay;
+              b2.vx += ax;
+              b2.vy += ay;
+            }
+          }
+        }
+      }
+
+      // --- 描画処理 -----------------------------
+      function draw() {
+        drawStars();
+
+        for (const b of balls) {
+          let scale = 1;
+          let alpha = 1;
+          if (b.burstFrame < burstDuration) {
+            const t = b.burstFrame / burstDuration;
+            scale = 0.5 + 0.5 * t;
+            alpha = t;
+            b.burstFrame++;
+          }
+
+          ctx.save();
+          ctx.translate(b.x + b.width / 2, b.y + b.height / 2);
+          ctx.rotate(b.angle);
+          ctx.scale(scale, scale);
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(img, -b.width / 2, -b.height / 2, b.width, b.height);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // --- メインループ -------------------------
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      // --- クリックで分裂 -----------------------
+      canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        const newBalls = [];
+
+        for (let i = balls.length - 1; i >= 0; i--) {
+          const b = balls[i];
+          const hit =
+            mx >= b.x &&
+            mx <= b.x + b.width &&
+            my >= b.y &&
+            my <= b.y + b.height;
+
+          if (hit && b.width > minSize) {
+            const newW = b.width * splitFactor;
+            const newH = b.height * splitFactor;
+
+            newBalls.push({
+              x: b.x,
+              y: b.y,
+              width: newW,
+              height: newH,
+              vx: b.vx + 1,
+              vy: b.vy + 1,
+              angle: 0,
+              spin: b.spin,
+              burstFrame: 0,
+            });
+
+            newBalls.push({
+              x: b.x + (b.width - newW),
+              y: b.y + (b.height - newH),
+              width: newW,
+              height: newH,
+              vx: b.vx - 1,
+              vy: b.vy - 1,
+              angle: 0,
+              spin: -b.spin,
+              burstFrame: 0,
+            });
+
+            balls.splice(i, 1);
+          }
+        }
+
+        balls.push(...newBalls);
+      });
+
+      img.onload = () => loop();
+    </script>
+  </body>
+</html>
