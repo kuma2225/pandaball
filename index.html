@@ -10,11 +10,11 @@
         align-items: center;
         height: 100vh;
         margin: 0;
-        background: #ffffff; /* 宇宙背景 */
+        background: #ffffff;
       }
       canvas {
-        background: #715fb7; /* 星空の色 */
-        border: 2px solid #333;
+        background: #715fb7;
+        border: 2px solid #715fb7;
         border-radius: 15px;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
       }
@@ -30,7 +30,11 @@
       const img = new Image();
       img.src = "pandaball.png";
 
-      // --- パラメータ ---------------------------
+      const popSound = new Audio("pon.mp3");
+      const bgm = new Audio("utyuu.mp3");
+      bgm.loop = true;
+      bgm.volume = 0.2;
+
       const gravity = 0;
       const bounceFactor = 1;
       const splitFactor = 2 / 3;
@@ -41,16 +45,16 @@
       const starCount = 100;
       const stars = [];
 
-      // --- 星の初期化 ---------------------------
       for (let i = 0; i < starCount; i++) {
         stars.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
           size: Math.random() * 1.5 + 0.5,
+          alpha: Math.random(),
+          delta: Math.random() * 0.02 + 0.005,
         });
       }
 
-      // --- 最初のボール -------------------------
       const balls = [
         {
           x: canvas.width / 2 - 24,
@@ -65,50 +69,45 @@
         },
       ];
 
-      // --- 星の描画 -----------------------------
       function drawStars() {
-        ctx.fillStyle = "#715fb7"; // 星空の背景色
+        ctx.fillStyle = "#715fb7"; // 星空背景
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.fillStyle = "white"; // 星の色（白）
         for (const star of stars) {
+          star.alpha += star.delta;
+          if (star.alpha <= 0 || star.alpha >= 1) {
+            star.delta *= -1;
+            star.alpha = Math.max(0, Math.min(1, star.alpha));
+          }
+          ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
           ctx.beginPath();
           ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      // --- 更新処理 -----------------------------
       function update() {
         for (const b of balls) {
           b.vy += gravity;
           b.x += b.vx;
           b.y += b.vy;
 
-          // 最大速度制限
           b.vx = Math.max(-maxSpeed, Math.min(maxSpeed, b.vx));
           b.vy = Math.max(-maxSpeed, Math.min(maxSpeed, b.vy));
 
-          if (b.x <= 0) {
-            b.x = 0;
+          if (b.x <= 0 || b.x + b.width >= canvas.width) {
             b.vx *= -bounceFactor;
-          } else if (b.x + b.width >= canvas.width) {
-            b.x = canvas.width - b.width;
-            b.vx *= -bounceFactor;
+            b.x = Math.max(0, Math.min(canvas.width - b.width, b.x));
           }
 
-          if (b.y <= 0) {
-            b.y = 0;
+          if (b.y <= 0 || b.y + b.height >= canvas.height) {
             b.vy *= -bounceFactor;
-          } else if (b.y + b.height >= canvas.height) {
-            b.y = canvas.height - b.height;
-            b.vy *= -bounceFactor;
+            b.y = Math.max(0, Math.min(canvas.height - b.height, b.y));
           }
 
           b.angle += b.spin;
         }
 
-        // 衝突判定
         for (let i = 0; i < balls.length; i++) {
           for (let j = i + 1; j < balls.length; j++) {
             const b1 = balls[i];
@@ -132,7 +131,6 @@
         }
       }
 
-      // --- 描画処理 -----------------------------
       function draw() {
         drawStars();
 
@@ -157,15 +155,15 @@
         }
       }
 
-      // --- メインループ -------------------------
       function loop() {
         update();
         draw();
         requestAnimationFrame(loop);
       }
 
-      // --- クリックで分裂 -----------------------
       canvas.addEventListener("click", (e) => {
+        if (bgm.paused) bgm.play();
+
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
@@ -181,6 +179,9 @@
             my <= b.y + b.height;
 
           if (hit && b.width > minSize) {
+            popSound.currentTime = 0;
+            popSound.play();
+
             const newW = b.width * splitFactor;
             const newH = b.height * splitFactor;
 
