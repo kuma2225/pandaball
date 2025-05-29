@@ -11,6 +11,7 @@
         height: 100vh;
         margin: 0;
         background: #ffffff;
+        touch-action: manipulation; /* スマホのダブルタップ拡大を防止 */
       }
       canvas {
         background: #715fb7;
@@ -34,6 +35,8 @@
       const bgm = new Audio("utyuu.mp3");
       bgm.loop = true;
       bgm.volume = 0.2;
+
+      let bgmStarted = false; // BGMが再生済みかどうか
 
       const gravity = 0;
       const bounceFactor = 1;
@@ -70,7 +73,7 @@
       ];
 
       function drawStars() {
-        ctx.fillStyle = "#715fb7"; // 星空背景
+        ctx.fillStyle = "#715fb7";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         for (const star of stars) {
@@ -161,12 +164,15 @@
         requestAnimationFrame(loop);
       }
 
-      canvas.addEventListener("click", (e) => {
-        if (bgm.paused) bgm.play();
+      function handleClickOrTap(e) {
+        if (!bgmStarted) {
+          bgm.play();
+          bgmStarted = true;
+        }
 
         const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const mx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const my = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
 
         const newBalls = [];
 
@@ -214,7 +220,11 @@
         }
 
         balls.push(...newBalls);
-      });
+      }
+
+      // クリックとタップの両方に対応
+      canvas.addEventListener("click", handleClickOrTap);
+      canvas.addEventListener("touchstart", handleClickOrTap);
 
       img.onload = () => loop();
     </script>
